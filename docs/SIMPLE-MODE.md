@@ -26,6 +26,12 @@ User → n8n Instance → PostgreSQL
 
 Use the Deploy-to-DO button in the README.
 
+## Manage and Run Workflows in Browser
+
+After deployment, open your app URL and use the n8n editor to create, modify, and execute workflows.
+
+See [Workflow Web Runner](./WORKFLOW-RUNNER.md) for quick steps.
+
 ## Limitations
 
 - No horizontal scaling
