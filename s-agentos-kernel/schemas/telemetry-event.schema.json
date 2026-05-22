@@ -3,48 +3,19 @@
   "$id": "https://s-agentos.local/schemas/telemetry-event.schema.json",
   "title": "S/ AgentOS Telemetry Event",
   "type": "object",
-  "required": [
-    "event_type"
-  ],
+  "required": ["event_type"],
   "additionalProperties": false,
   "properties": {
-    "event_type": {
-      "type": "string"
-    },
-    "source": {
-      "type": "string",
-      "default": "unknown"
-    },
+    "event_type": { "type": "string" },
+    "source": { "type": "string", "default": "unknown" },
     "severity": {
       "type": "string",
-      "enum": [
-        "critical",
-        "error",
-        "warning",
-        "info",
-        "debug"
-      ],
+      "enum": ["critical", "error", "warning", "info", "debug"],
       "default": "info"
     },
-    "agent_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "command_id": {
-      "type": [
-        "string",
-        "null"
-      ]
-    },
-    "payload": {
-      "type": "object",
-      "additionalProperties": true
-    },
-    "metadata": {
-      "type": "object",
-      "additionalProperties": true
-    }
+    "agent_id": { "type": ["string", "null"] },
+    "command_id": { "type": ["string", "null"] },
+    "payload": { "type": "object", "additionalProperties": true },
+    "metadata": { "type": "object", "additionalProperties": true }
   }
 }

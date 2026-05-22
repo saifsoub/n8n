@@ -84,34 +84,5 @@
       "additionalProperties": true,
       "default": {}
     }
-  },
-  "examples": [
-    {
-      "command_id": "cmd_1748908800000_abc123",
-      "trace_id": "trace_1748908800000_def456",
-      "idempotency_key": "idem_health_20260522_001",
-      "action": "health_check",
-      "objective": "Check kernel status",
-      "requested_by": "seif",
-      "priority": "low",
-      "run_mode": "dry_run",
-      "approval_status": "not_required",
-      "agent_id": null,
-      "context": {},
-      "metadata": { "client": "curl" }
-    },
-    {
-      "action": "create_agent",
-      "objective": "Create a Telegram revenue operations agent",
-      "requested_by": "seif",
-      "priority": "high",
-      "run_mode": "draft",
-      "approval_status": "not_required",
-      "context": {
-        "domain": "Telegram monetization",
-        "output_format": "dashboard + alerts",
-        "specialization": "payments, funnels, retention"
-      }
-    }
-  ]
+  }
 }
