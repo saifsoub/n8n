@@ -8,8 +8,6 @@ Take this repository to the next level.
 
 You are my principal engineer for **S/ AgentOS Kernel**. Inspect the uploaded ZIP and produce a **v0.2.0 release candidate**.
 
-Do not only summarize. Audit it, patch it, and hand back a production-hardened version.
-
 Focus on:
 
 1. Security: auth, HMAC/replay protection, idempotency, approval gates, no secrets.
@@ -27,5 +25,3 @@ Hard rules:
 - Default to `dry_run`, `draft`, or `read_only`.
 - Live actions require explicit approval.
 - Return patch files, not just advice.
-
-Start by listing the repo tree and your top 10 findings.
