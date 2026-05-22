@@ -78,12 +78,12 @@ Commands can chain:
 │  └──────┬───────┘  └──────┬──────┘  └──────┬───────┘  └──────┬────────┘ │
 │         └────────────────┬┴─────────────────┘                │          │
 │                          │ HTTPS POST + X-AgentOS-Key         │          │
-└──────────────────────────┼────────────────────────────────────┼──────────┘
+└──────────────────────────┼────────────────────────────┼──────────┘
                            │                                    │
-┌──────────────────────────┼────────────────────────────────────┼──────────┐
+┌──────────────────────────┼────────────────────────────┼──────────┐
 │                   KERNEL GATEWAY LAYER (n8n)                              │
 │                          │                                    │          │
-│  ┌───────────────────────▼────────────────────────────────────▼───────┐  │
+│  ┌───────────────────────▼────────────────────────▼───────┐  │
 │  │              S/ AgentOS Command Gateway v0.2.0                     │  │
 │  │                                                                    │  │
 │  │  1. Auth check (X-AgentOS-Key / Bearer)                           │  │
@@ -97,40 +97,8 @@ Commands can chain:
 │  │  6. Execute route handler                                         │  │
 │  │  7. Log outcome event                                             │  │
 │  │  8. Return response envelope                                      │  │
-│  └────────────────────────────────────────────────────────────────────┘  │
-│                                                                           │
-│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐   │
-│  │ Registry Service │  │ Telemetry Logger │  │ Evolution Planner    │   │
-│  │ /s-agentos-      │  │ /s-agentos-      │  │ /s-agentos-          │   │
-│  │  registry        │  │  telemetry       │  │  evolution           │   │
-│  └──────────────────┘  └──────────────────┘  └──────────────────────┘   │
-└───────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ HTTPS / Supabase REST
-                                    │
-┌───────────────────────────────────┼───────────────────────────────────────┐
-│                        OPERATING MEMORY (Supabase/PostgreSQL)              │
-│                                                                            │
-│  os_commands          │ Every command received                            │
-│  os_events            │ All telemetry and system events                   │
-│  agent_registry       │ Agent catalog with capabilities                   │
-│  agent_runs           │ Execution history per agent                       │
-│  eval_results         │ Evaluation scores and test results                │
-│  evolution_plans      │ Proposed improvements (approval-gated)            │
-│  idempotency_keys     │ Dedup cache for live actions (24h TTL)            │
-│  approval_requests    │ Operator approval queue                           │
-│  audit_log            │ Immutable append-only audit trail                 │
-│  workflow_registry    │ n8n workflow → AgentOS mapping                    │
-│  model_registry       │ Available LLM providers and models                │
-└────────────────────────────────────────────────────────────────────────────┘
-                                    │
-                                    │ (optional, future)
-                                    │
-┌───────────────────────────────────┼───────────────────────────────────────┐
-│                     OUTPUT CHANNELS (pluggable)                            │
-│                                                                            │
-│  Telegram Bot  │  Slack  │  Email  │  Webhook  │  Dashboard  │  WhatsApp  │
-└────────────────────────────────────────────────────────────────────────────┘
+│  └────────────────────────────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -169,30 +137,7 @@ Every operation uses the same JSON structure:
 }
 ```
 
-### Response Envelope
-
-Every response follows the same structure:
-
-```json
-{
-  "ok": true,
-  "kernel_version": "v0.2.0",
-  "trace_id": "trace_...",
-  "command_id": "cmd_...",
-  "action": "create_agent",
-  "run_mode": "draft",
-  "approval_status": "not_required",
-  "route": "agent_factory",
-  "result": { ... }
-}
-```
-
----
-
 ## Model Layer (Provider-Agnostic)
-
-The kernel is designed to route LLM calls to any provider. The `model_preference`
-context field accepts:
 
 ```json
 {
@@ -214,63 +159,6 @@ Provider routing in n8n:
 
 ---
 
-## Agent Capabilities
-
-Each agent in the registry declares capabilities:
-
-```json
-{
-  "agent_code": "ag_revenue_ops",
-  "agent_name": "Revenue Operations Agent",
-  "capabilities": [
-    "telegram_notify",
-    "revenue_analysis",
-    "data_query",
-    "executive_briefing"
-  ]
-}
-```
-
-Capability matching: when a command specifies `context.capabilities_required`,
-the gateway can pre-filter agents that have the required capabilities before
-routing to the execution handler.
-
----
-
-## Approval Flow
-
-```
-Operator submits command with run_mode: "live"
-  │
-  ├── action is health_check / list / read?
-  │     └── approval_status: not_required → execute immediately
-  │
-  └── action is write / consequential?
-        ├── approval_status: "approved"?
-        │     └── check approval_requests table → execute if valid
-        │
-        └── approval_status: "not_required" or "pending"?
-              └── block execution → return { ok: false, error: "Approval required" }
-                  → insert into approval_requests
-                  → notify operator (Telegram / dashboard)
-```
-
----
-
-## Data Retention
-
-| Table | Retention | Notes |
-|-------|-----------|-------|
-| os_commands | Indefinite | Primary command log |
-| os_events | 90 days (recommended) | High volume — prune old rows |
-| agent_runs | 90 days | Execution history |
-| eval_results | Indefinite | Quality record |
-| evolution_plans | Indefinite | Change history |
-| idempotency_keys | 24 hours | Auto-TTL via scheduled cleanup |
-| audit_log | Indefinite | Compliance — never delete |
-
----
-
 ## Future Roadmap
 
 ### v0.3 — Live enforcement
@@ -283,7 +171,6 @@ Operator submits command with run_mode: "live"
 - LLM calls integrated into `create_agent` handler
 - Model provider routing per agent capability
 - Token cost tracking per command written to `audit_log`
-- Evaluation with golden examples
 
 ### v1.0 — Production hardening
 - Full RLS on all Supabase tables
