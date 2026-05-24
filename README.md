@@ -67,11 +67,25 @@ http://localhost:5678
 
 ---
 
+## Operator Layer
+
+See:
+
+```txt
+docs/CONTROL-SURFACE.md
+```
+
+This gives operators and agents a lightweight operational overview without opening n8n first.
+
+---
+
 ## Repo Structure
 
 ```txt
 .github/workflows/       CI validation
 workflows/               n8n workflow JSON files
+scripts/                 runtime and validation helpers
+docs/                    operations and governance
 .env.example             environment template
 docker-compose.local.yml local runtime stack
 ```
