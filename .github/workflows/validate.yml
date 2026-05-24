@@ -1,0 +1,23 @@
+name: Validate n8n Stack
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow JSON files
+        run: |
+          find workflows -name '*.json' -print0 | while IFS= read -r -d '' file; do
+            jq empty "$file"
+          done
+
+      - name: Validate docker compose
+        run: |
+          docker compose -f docker-compose.local.yml config >/dev/null
