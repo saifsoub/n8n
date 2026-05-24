@@ -1,0 +1,65 @@
+{
+  "name": "Telegram Approval Flow",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message",
+          "callback_query"
+        ]
+      },
+      "id": "telegram-trigger",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1,
+      "position": [200,300]
+    },
+    {
+      "parameters": {
+        "chatId": "={{$env.TELEGRAM_CHAT_ID}}",
+        "text": "New approval request received.",
+        "replyMarkup": "inlineKeyboard",
+        "inlineKeyboard": {
+          "rows": [
+            {
+              "row": {
+                "buttons": [
+                  {
+                    "text": "Approve",
+                    "additionalFields": {
+                      "callback_data": "approve"
+                    }
+                  },
+                  {
+                    "text": "Reject",
+                    "additionalFields": {
+                      "callback_data": "reject"
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      },
+      "id": "telegram-send",
+      "name": "Send Approval Card",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1,
+      "position": [520,300]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Send Approval Card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}
