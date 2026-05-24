@@ -12,6 +12,11 @@ build/
 compiled/
 *.log
 
+# n8n runtime
+.n8n/
+backups/
+*.sqlite
+
 # IDE
 .vscode/
 .idea/
