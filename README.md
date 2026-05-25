@@ -1,5 +1,23 @@
 # S/ n8n Operating Stack
 
+[![Stack](https://img.shields.io/badge/part%20of-S%2F%20Operator%20Stack-0f766e)](docs/ECOSYSTEM.md)
+[![Pairs with](https://img.shields.io/badge/control%20plane-S--OS-blue)](https://github.com/saifsoub/S-OS)
+[![Cockpit](https://img.shields.io/badge/cockpit-AgentEmpire-purple)](https://github.com/saifsoub/AgentEmpire)
+
+Local-first **automation runtime** for S/ and DoneAi: Docker, Postgres, Redis, workflow JSON, and CI validation.
+
+Part of the **S/ Operator Stack** — see [docs/ECOSYSTEM.md](docs/ECOSYSTEM.md):
+
+| Repo | Role |
+|------|------|
+| [S-OS](https://github.com/saifsoub/S-OS) | AgentOS control plane (gateway, registry, schemas) |
+| **n8n** (this repo) | Workflow engine + ops runbooks |
+| [AgentEmpire](https://github.com/saifsoub/AgentEmpire) | Operator dashboard UI |
+
+Import kernel workflows from **S-OS** into this n8n instance after the stack is up.
+
+---
+
 A practical local-first n8n operating repository for:
 
 - Telegram approval workflows
