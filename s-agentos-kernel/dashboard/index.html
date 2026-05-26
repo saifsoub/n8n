@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>S/ AgentOS Kernel v0.2.0 — Command Control</title>
+  <style>
+    :root {
+      --bg-primary: #08080c;
+      --bg-secondary: #0f0f14;
+      --bg-panel: rgba(255,255,255,0.035);
+      --glass-bg: rgba(255,255,255,0.04);
+      --glass-border: rgba(255,255,255,0.07);
+      --glass-border-hover: rgba(255,255,255,0.12);
+      --accent: #d4a853;
+      --accent-dim: rgba(212,168,83,0.15);
+      --accent-glow: rgba(212,168,83,0.3);
+      --text-primary: #e8e8ec;
+      --text-secondary: #8a8a95;
+      --text-muted: #5a5a65;
+      --success: #4ade80;
+      --success-dim: rgba(74,222,128,0.15);
+      --error: #f87171;
+      --error-dim: rgba(248,113,113,0.15);
+      --error-bg: rgba(248,113,113,0.08);
+      --warning: #fbbf24;
+      --font-mono: 'SF Mono', 'Fira Code', 'Cascadia Code', Consolas, monospace;
+      --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --transition: all 0.2s ease;
+      --radius: 10px;
+      --radius-sm: 6px;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { font-size: 15px; }
+    body { font-family: var(--font-sans); background: var(--bg-primary); color: var(--text-primary); line-height: 1.6; min-height: 100vh; overflow-x: hidden; }
+    body::before { content: ''; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: radial-gradient(ellipse 600px 400px at 15% 10%, rgba(90,70,140,0.06) 0%, transparent 70%), radial-gradient(ellipse 500px 500px at 85% 80%, rgba(60,80,130,0.05) 0%, transparent 70%); pointer-events: none; z-index: 0; }
+    .container { max-width: 1280px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 3px; }
+    .header { padding: 28px 0; border-bottom: 1px solid var(--glass-border); margin-bottom: 28px; }
+    .header-inner { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; }
+    .brand-title { font-family: var(--font-mono); font-size: 1.5rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; }
+    .brand-title .accent { color: var(--accent); }
+    .brand-subtitle { font-size: 0.8rem; color: var(--text-secondary); letter-spacing: 0.05em; }
+    .header-meta { display: flex; align-items: center; gap: 20px; font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-secondary); }
+    .indicator-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 8px rgba(74,222,128,0.4); animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .panel { background: var(--glass-bg); backdrop-filter: blur(12px); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 24px; margin-bottom: 24px; transition: var(--transition); }
+    .panel:hover { border-color: var(--glass-border-hover); }
+    .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 8px; }
+    .panel-title { font-size: 0.82rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; }
+    .panel-title .icon { color: var(--accent); margin-right: 8px; }
+    .settings-toggle { background: none; border: 1px solid var(--glass-border); color: var(--text-secondary); padding: 6px 14px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; transition: var(--transition); }
+    .settings-toggle:hover { border-color: var(--accent); color: var(--accent); }
+    .settings-content { display: none; animation: fadeIn 0.3s ease; }
+    .settings-content.open { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 768px) { .form-grid { grid-template-columns: 1fr; } }
+    .field-group { display: flex; flex-direction: column; gap: 6px; }
+    .field-label { font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 500; }
+    .field-input { background: rgba(255,255,255,0.04); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 10px 12px; color: var(--text-primary); font-family: var(--font-mono); font-size: 0.82rem; transition: var(--transition); outline: none; width: 100%; }
+    .field-input:focus { border-color: var(--accent); background: rgba(255,255,255,0.06); }
+    .field-input::placeholder { color: var(--text-muted); }
+    .password-wrapper { position: relative; }
+    .password-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.75rem; padding: 4px 8px; transition: var(--transition); }
+    .password-toggle:hover { color: var(--accent); }
+    .security-warning { background: var(--error-dim); border: 1px solid rgba(251,191,36,0.2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 0.78rem; color: var(--warning); font-family: var(--font-mono); line-height: 1.5; margin-bottom: 16px; }
+    .security-warning::before { content: '\26A0  '; }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 22px; border-radius: var(--radius-sm); font-family: var(--font-sans); font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: var(--transition); border: none; outline: none; }
+    .btn-primary { background: var(--accent); color: #1a1508; }
+    .btn-primary:hover { background: #e0b86a; box-shadow: 0 0 20px rgba(212,168,83,0.2); }
+    .btn-secondary { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid var(--glass-border); }
+    .btn-secondary:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+    .btn-small { padding: 6px 14px; font-size: 0.75rem; }
+    .btn-group { display: flex; gap: 10px; flex-wrap: wrap; }
+    .status-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    @media (max-width: 1024px) { .status-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 480px) { .status-grid { grid-template-columns: 1fr; } }
+    .status-card { background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: var(--radius); padding: 20px; transition: var(--transition); }
+    .status-card:hover { border-color: var(--glass-border-hover); }
+    .status-card-label { font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 8px; }
+    .status-card-value { font-family: var(--font-mono); font-size: 1.1rem; font-weight: 600; }
+    .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 100px; font-size: 0.72rem; font-weight: 600; }
+    .status-badge.online { background: var(--success-dim); color: var(--success); }
+    .status-badge.offline { background: var(--error-dim); color: var(--error); }
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; }
+    .status-badge.online .status-dot { background: var(--success); }
+    .status-badge.offline .status-dot { background: var(--error); }
+    .preset-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+    @media (max-width: 1024px) { .preset-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px) { .preset-grid { grid-template-columns: repeat(2, 1fr); } }
+    .preset-btn { background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 12px 8px; color: var(--text-secondary); font-family: var(--font-mono); font-size: 0.75rem; cursor: pointer; transition: var(--transition); text-align: center; position: relative; overflow: hidden; }
+    .preset-btn::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: var(--accent-dim); opacity: 0; transition: var(--transition); }
+    .preset-btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+    .preset-btn:hover::before { opacity: 1; }
+    .preset-btn span { position: relative; z-index: 1; }
+    .composer-grid { display: grid; grid-template-columns: 200px 1fr; gap: 16px; margin-bottom: 16px; }
+    @media (max-width: 600px) { .composer-grid { grid-template-columns: 1fr; } }
+    .composer-textarea { width: 100%; min-height: 220px; background: rgba(255,255,255,0.03); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 16px; color: #ce9178; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.6; resize: vertical; transition: var(--transition); outline: none; }
+    .composer-textarea:focus { border-color: var(--accent); background: rgba(255,255,255,0.04); }
+    .composer-textarea::placeholder { color: var(--text-muted); }
+    .composer-actions { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+    .composer-actions-left { display: flex; gap: 10px; }
+    .console-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px; }
+    .console-meta { display: flex; gap: 16px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); }
+    .console-meta-item { display: flex; align-items: center; gap: 6px; }
+    .console-meta-value { color: var(--text-secondary); }
+    .http-status { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 0.7rem; }
+    .http-status.success { background: var(--success-dim); color: var(--success); }
+    .http-status.error { background: var(--error-dim); color: var(--error); }
+    .console-body { background: rgba(0,0,0,0.3); border: 1px solid var(--glass-border); border-radius: var(--radius-sm); padding: 20px; max-height: 420px; overflow-y: auto; font-family: var(--font-mono); font-size: 0.8rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word; transition: var(--transition); }
+    .console-body.error-state { border-color: rgba(248,113,113,0.25); background: var(--error-bg); }
+    .console-placeholder { color: var(--text-muted); font-style: italic; }
+    .json-key { color: #9cdcfe; } .json-string { color: #ce9178; } .json-number { color: #b5cea8; } .json-boolean { color: #569cd6; } .json-null { color: #569cd6; } .json-bracket { color: #d4d4d4; }
+    .footer { padding: 24px 0; border-top: 1px solid var(--glass-border); margin-top: 8px; text-align: center; }
+    .footer-text { font-size: 0.72rem; color: var(--text-muted); line-height: 1.7; max-width: 700px; margin: 0 auto; }
+    .hidden { display: none !important; }
+    .fade-in { animation: fadeIn 0.3s ease; }
+    .error-text { color: var(--error); font-size: 0.78rem; margin-top: 6px; }
+    .success-text { color: var(--success); font-size: 0.78rem; margin-top: 6px; }
+    select.field-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a8a95' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 36px; }
+    select.field-input option { background: #1a1a22; color: var(--text-primary); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="header-inner">
+        <div class="brand">
+          <div class="brand-title">S/ <span class="accent">AgentOS</span></div>
+          <div class="brand-subtitle">Kernel v0.2.0 &mdash; Command Control</div>
+        </div>
+        <div class="header-meta">
+          <div class="live-clock" id="liveClock">--</div>
+          <div style="display:flex;align-items:center;gap:8px">
+            <div class="indicator-dot" id="connDot"></div>
+            <span id="connText">Connected</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title"><span class="icon">&#9881;</span>Connection Settings</div>
+        <button class="settings-toggle" onclick="toggleSettings()">Show / Hide</button>
+      </div>
+      <div class="settings-content" id="settingsContent">
+        <div class="security-warning">Never paste Supabase service-role keys or LLM API keys here. Only the webhook URL and operator key are needed. This dashboard only calls your n8n webhook &mdash; it never connects directly to Supabase or any LLM service.</div>
+        <div class="form-grid">
+          <div class="field-group">
+            <label class="field-label">n8n Webhook URL</label>
+            <input type="url" class="field-input" id="webhookUrl" placeholder="https://your-n8n.domain.com/webhook/s-agentos-command">
+          </div>
+          <div class="field-group">
+            <label class="field-label">Operator Key</label>
+            <div class="password-wrapper">
+              <input type="password" class="field-input" id="operatorKey" placeholder="your-operator-key">
+              <button class="password-toggle" id="pwToggle" onclick="togglePassword()">Show</button>
+            </div>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary btn-small" onclick="saveSettings()">Save to Session</button>
+          <button class="btn btn-secondary btn-small" onclick="clearSettings()">Clear</button>
+        </div>
+        <div id="settingsMsg"></div>
+      </div>
+    </div>
+
+    <div class="status-grid">
+      <div class="status-card"><div class="status-card-label">System Status</div><div class="status-card-value"><span class="status-badge online" id="systemStatus"><span class="status-dot"></span> Online</span></div></div>
+      <div class="status-card"><div class="status-card-label">Kernel Version</div><div class="status-card-value">v0.2.0</div></div>
+      <div class="status-card"><div class="status-card-label">Last Command ID</div><div class="status-card-value" id="lastCmdId" style="font-size:0.85rem;color:var(--text-muted)">--</div></div>
+      <div class="status-card"><div class="status-card-label">Response Latency</div><div class="status-card-value" id="respLatency" style="font-size:0.85rem;color:var(--text-muted)">-- ms</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title"><span class="icon">&#9654;</span>Command Presets</div></div>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title"><span class="icon">&#9998;</span>Command Composer</div></div>
+      <div class="composer-grid">
+        <div class="field-group">
+          <label class="field-label">Action</label>
+          <select class="field-input" id="actionSelect" onchange="onActionChange(this.value)">
+            <option value="health_check">health_check</option>
+            <option value="create_agent">create_agent</option>
+            <option value="execute_task">execute_task</option>
+            <option value="evaluate_agent">evaluate_agent</option>
+            <option value="evolve_agent">evolve_agent</option>
+            <option value="registry_sync">registry_sync</option>
+            <option value="telemetry_log">telemetry_log</option>
+            <option value="list_agents">list_agents</option>
+            <option value="get_agent">get_agent</option>
+            <option value="update_agent_status">update_agent_status</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">JSON Payload</label>
+          <textarea class="composer-textarea" id="jsonPayload" placeholder="Enter JSON payload..." spellcheck="false"></textarea>
+        </div>
+      </div>
+      <div class="composer-actions">
+        <div class="composer-actions-left">
+          <button class="btn btn-secondary btn-small" onclick="formatJson()">Format JSON</button>
+          <button class="btn btn-secondary btn-small" onclick="clearComposer()">Clear</button>
+        </div>
+        <button class="btn btn-primary" onclick="sendCommand()"><span>&#10148;</span> Send Command</button>
+      </div>
+      <div id="composerMsg"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header"><div class="panel-title"><span class="icon">&#9632;</span>Response Console</div></div>
+      <div class="console-toolbar">
+        <div class="console-meta">
+          <div class="console-meta-item"><span style="color:var(--text-muted)">Status:</span><span class="http-status" id="httpStatus">--</span></div>
+          <div class="console-meta-item"><span style="color:var(--text-muted)">Latency:</span><span class="console-meta-value" id="consoleLatency">--</span></div>
+          <div class="console-meta-item"><span style="color:var(--text-muted)">Time:</span><span class="console-meta-value" id="respTime">--</span></div>
+        </div>
+      </div>
+      <div class="console-body" id="consoleBody"><span class="console-placeholder">No command sent yet.</span></div>
+    </div>
+
+    <footer class="footer">
+      <p class="footer-text">
+        <strong style="color:var(--warning)">Security Notice:</strong> Operator key stored in sessionStorage (cleared on tab close). This dashboard only calls your n8n webhook. It never connects to Supabase directly or stores LLM API keys.
+        <br>S/ AgentOS Kernel v0.2.0
+      </p>
+    </footer>
+  </div>
+
+  <script>
+  const PRESETS = {
+    health_check: { action: "health_check", objective: "Check system status", requested_by: "operator", run_mode: "dry_run" },
+    create_agent: { action: "create_agent", objective: "Create a Telegram revenue operations agent.", requested_by: "operator", priority: "high", run_mode: "draft", approval_status: "not_required", context: { domain: "Telegram monetization", model_preference: { provider: "auto", tier: "fast", fallback: ["anthropic","groq","openai"] } } },
+    execute_task: { action: "execute_task", objective: "Produce a daily executive ops briefing.", requested_by: "operator", priority: "medium", run_mode: "draft", agent_id: "ag_ops_briefing" },
+    evaluate_agent: { action: "evaluate_agent", objective: "Evaluate agent performance after 30 days.", agent_id: "ag_001", requested_by: "operator" },
+    evolve_agent: { action: "evolve_agent", objective: "Improve agent output quality.", agent_id: "ag_001", priority: "high", run_mode: "draft", context: { detected_gap: "response_latency_high" } },
+    registry_sync: { action: "registry_sync", objective: "Synchronize agent registry.", requested_by: "operator" },
+    telemetry_log: { action: "telemetry_log", objective: "Log manual telemetry event.", requested_by: "operator", context: { event_type: "manual_check", source: "dashboard", severity: "info" } },
+    list_agents: { action: "list_agents", objective: "List all registered agents.", requested_by: "operator" },
+    get_agent: { action: "get_agent", objective: "Get agent details.", agent_id: "ag_001", requested_by: "operator" },
+    update_agent_status: { action: "update_agent_status", objective: "Update agent lifecycle status.", agent_id: "ag_001", requested_by: "operator", context: { new_status: "paused" } }
+  };
+
+  const PRESET_ORDER = ['health_check','create_agent','execute_task','evaluate_agent','evolve_agent','registry_sync','telemetry_log','list_agents','get_agent','update_agent_status'];
+
+  const $ = id => document.getElementById(id);
+
+  function init() {
+    loadSettings();
+    buildPresets();
+    loadPreset('health_check');
+    startClock();
+  }
+
+  function buildPresets() {
+    const grid = $('presetGrid');
+    grid.innerHTML = '';
+    PRESET_ORDER.forEach(action => {
+      const btn = document.createElement('button');
+      btn.className = 'preset-btn';
+      btn.innerHTML = '<span>' + action + '</span>';
+      btn.onclick = () => loadPreset(action);
+      grid.appendChild(btn);
+    });
+  }
+
+  function loadPreset(action) {
+    const preset = PRESETS[action];
+    if (!preset) return;
+    $('actionSelect').value = action;
+    $('jsonPayload').value = JSON.stringify(preset, null, 2);
+    clearMsg($('composerMsg'));
+  }
+
+  function onActionChange(action) { if (PRESETS[action]) loadPreset(action); }
+
+  function startClock() {
+    const update = () => { $('liveClock').textContent = new Date().toISOString().replace('T',' ').slice(0,19) + ' UTC'; };
+    update(); setInterval(update, 1000);
+  }
+
+  function toggleSettings() {
+    $('settingsContent').classList.toggle('open');
+  }
+
+  function togglePassword() {
+    const inp = $('operatorKey');
+    const isPw = inp.type === 'password';
+    inp.type = isPw ? 'text' : 'password';
+    $('pwToggle').textContent = isPw ? 'Hide' : 'Show';
+  }
+
+  function saveSettings() {
+    try {
+      sessionStorage.setItem('agentos_webhook_url', $('webhookUrl').value.trim());
+      sessionStorage.setItem('agentos_operator_key', $('operatorKey').value.trim());
+      showMsg($('settingsMsg'), 'Saved to session.', 'success');
+    } catch(e) { showMsg($('settingsMsg'), 'Failed: ' + e.message, 'error'); }
+  }
+
+  function clearSettings() {
+    $('webhookUrl').value = ''; $('operatorKey').value = '';
+    try { sessionStorage.removeItem('agentos_webhook_url'); sessionStorage.removeItem('agentos_operator_key'); } catch(e) {}
+    showMsg($('settingsMsg'), 'Cleared.', 'success');
+  }
+
+  function loadSettings() {
+    try {
+      const url = sessionStorage.getItem('agentos_webhook_url');
+      const key = sessionStorage.getItem('agentos_operator_key');
+      if (url) $('webhookUrl').value = url;
+      if (key) $('operatorKey').value = key;
+    } catch(e) {}
+  }
+
+  function formatJson() {
+    try { $('jsonPayload').value = JSON.stringify(JSON.parse($('jsonPayload').value), null, 2); showMsg($('composerMsg'), 'Formatted.', 'success'); }
+    catch(e) { showMsg($('composerMsg'), 'Invalid JSON: ' + e.message, 'error'); }
+  }
+
+  function clearComposer() { $('jsonPayload').value = ''; clearMsg($('composerMsg')); }
+
+  async function sendCommand() {
+    clearMsg($('composerMsg'));
+    const webhookUrl = $('webhookUrl').value.trim();
+    const operatorKey = $('operatorKey').value.trim();
+    if (!webhookUrl) { showMsg($('composerMsg'), 'Error: Webhook URL required.', 'error'); return; }
+    const rawPayload = $('jsonPayload').value.trim();
+    if (!rawPayload) { showMsg($('composerMsg'), 'Error: Payload is empty.', 'error'); return; }
+    let payload;
+    try { payload = JSON.parse(rawPayload); } catch(e) { showMsg($('composerMsg'), 'Invalid JSON: ' + e.message, 'error'); return; }
+
+    const consoleBody = $('consoleBody');
+    consoleBody.className = 'console-body';
+    consoleBody.innerHTML = '<span class="console-placeholder">Sending...</span>';
+    $('httpStatus').textContent = '...';
+    $('httpStatus').className = 'http-status';
+    $('consoleLatency').textContent = '--';
+    $('respTime').textContent = '--';
+
+    const startTime = performance.now();
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (operatorKey) headers['X-AgentOS-Key'] = operatorKey;
+      const response = await fetch(webhookUrl, { method: 'POST', headers, body: JSON.stringify(payload) });
+      const latency = Math.round(performance.now() - startTime);
+      const responseText = await response.text();
+      let responseData;
+      try { responseData = JSON.parse(responseText); } catch { responseData = { raw_response: responseText }; }
+      $('httpStatus').textContent = response.status + ' ' + response.statusText;
+      $('httpStatus').className = 'http-status ' + (response.ok ? 'success' : 'error');
+      $('consoleLatency').textContent = latency + ' ms';
+      $('respTime').textContent = new Date().toISOString().slice(0,19).replace('T',' ');
+      $('respLatency').textContent = latency + ' ms';
+      $('respLatency').style.color = 'var(--text-primary)';
+      if (responseData && responseData.command_id) { $('lastCmdId').textContent = responseData.command_id; $('lastCmdId').style.color = 'var(--accent)'; }
+      consoleBody.innerHTML = syntaxHighlightJson(JSON.stringify(responseData, null, 2));
+      if (!response.ok) consoleBody.classList.add('error-state');
+    } catch(error) {
+      const latency = Math.round(performance.now() - startTime);
+      $('httpStatus').textContent = 'Network Error'; $('httpStatus').className = 'http-status error';
+      $('consoleLatency').textContent = latency + ' ms';
+      consoleBody.classList.add('error-state');
+      consoleBody.innerHTML = syntaxHighlightJson(JSON.stringify({ error: error.name, message: error.message, suggestion: 'Check webhook URL and CORS config.' }, null, 2));
+    }
+  }
+
+  function syntaxHighlightJson(json) {
+    json = json.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return json.replace(
+      /("(?:\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*")(\s*:\s*)?|(-?\d+\.?\d*(?:[eE][+-]?\d+)?)|(true|false)|(null)|([{}\[\],])/g,
+      function(match, string, colon, number, bool, nullish, struct) {
+        if (string) return '<span class="' + (colon ? 'json-key' : 'json-string') + '">' + string + '</span>' + (colon || '');
+        if (number) return '<span class="json-number">' + number + '</span>';
+        if (bool) return '<span class="json-boolean">' + bool + '</span>';
+        if (nullish) return '<span class="json-null">' + nullish + '</span>';
+        if (struct) return '<span class="json-bracket">' + struct + '</span>';
+        return match;
+      }
+    );
+  }
+
+  function showMsg(el, text, type) {
+    el.textContent = text; el.className = type === 'error' ? 'error-text fade-in' : 'success-text fade-in';
+    setTimeout(() => clearMsg(el), 6000);
+  }
+
+  function clearMsg(el) { el.textContent = ''; el.className = ''; }
+
+  document.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+</html>
