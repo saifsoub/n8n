@@ -1,5 +1,5 @@
 -- ============================================================================
--- S/ AgentOS Kernel v0.1 — Complete Supabase/PostgreSQL Schema
+-- S/ AgentOS Kernel v0.2.0 — Complete Supabase/PostgreSQL Schema
 -- ============================================================================
 -- Description: Core operating memory schema for the AgentOS kernel.
 --              Stores commands, events, agent registry, execution runs,
@@ -7,7 +7,8 @@
 --              and model registry.
 --
 -- Usage:       Execute this SQL in the Supabase SQL Editor (or psql).
--- Version:     0.1.3
+--              Then run migrations/001_v0.2.0_idempotency_approval.sql
+-- Version:     0.2.0
 -- ============================================================================
 
 -- Enable required extensions
@@ -42,7 +43,7 @@ CREATE TABLE os_commands (
   metadata        jsonb DEFAULT '{}',
   parameters      jsonb DEFAULT '{}',
   received_at     timestamptz,
-  kernel_version  text DEFAULT '0.1.3',
+  kernel_version  text DEFAULT '0.2.0',
   created_at      timestamptz DEFAULT now(),
   updated_at      timestamptz DEFAULT now()
 );
@@ -77,7 +78,7 @@ CREATE TABLE os_events (
   metadata        jsonb DEFAULT '{}',
   action          text,
   status          text DEFAULT 'logged',
-  kernel_version  text DEFAULT '0.1.3',
+  kernel_version  text DEFAULT '0.2.0',
   created_at      timestamptz DEFAULT now()
 );
 
@@ -301,3 +302,4 @@ CREATE TRIGGER trg_model_registry_updated_at
 -- ============================================================================
 
 -- Tables: 8 | Indexes: 37 | Triggers: 5 | Extensions: pgcrypto
+-- Run migrations/001_v0.2.0_idempotency_approval.sql after this file.
