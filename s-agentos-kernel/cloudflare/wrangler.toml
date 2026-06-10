@@ -1,0 +1,12 @@
+name = "s-agentos-kernel"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+# Set secrets (never commit real values):
+#   npx wrangler secret put S_AGENTOS_OPERATOR_KEY
+#   npx wrangler secret put SUPABASE_URL
+#   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+
+[vars]
+# Public non-secret vars (override with secrets in production)
+KERNEL_ENV = "production"
