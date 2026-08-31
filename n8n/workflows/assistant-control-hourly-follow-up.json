@@ -1,0 +1,188 @@
+{
+  "name": "Assistant Hub — Hourly Follow-up",
+  "nodes": [
+    {
+      "parameters": { "rule": { "interval": [{ "field": "hours", "hoursInterval": 1 }] } },
+      "id": "hourly-trigger",
+      "name": "Every Hour",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [-900, -100]
+    },
+    {
+      "parameters": {},
+      "id": "manual-trigger",
+      "name": "Manual Evidence Run",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [-900, 100]
+    },
+    {
+      "parameters": {
+        "operation": "read",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $env.ASSISTANT_CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Assistant Control" },
+        "options": { "returnAllMatches": true }
+      },
+      "id": "read-control",
+      "name": "Read Assistant Control",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [-660, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_IN_N8N", "name": "Google Sheets OAuth2" } }
+    },
+    {
+      "parameters": {
+        "jsCode": "const active = new Set(['active', 'in progress', 'pending', 'ready', 'blocked']);\nreturn $input.all().filter(({json}) => active.has(String(json.Status ?? json.status ?? '').trim().toLowerCase())).map(item => ({ json: { ...item.json, _rowNumber: item.json.row_number ?? item.json.rowNumber, _runId: $execution.id, _readAt: new Date().toISOString() } }));"
+      },
+      "id": "active-only",
+      "name": "Keep Active Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-420, 0]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const r = $json;\nconst text = (...keys) => keys.map(k => r[k]).find(v => v !== undefined && v !== null) ?? '';\nconst yes = v => ['yes','true','1','approved','authorized'].includes(String(v).trim().toLowerCase());\nconst value = String(text('Has Value','has_value','Value')).trim().toLowerCase();\nconst status = String(text('Status','status')).trim().toLowerCase();\nconst next = String(text('Next Action','next_action')).trim();\nconst sensitive = yes(text('Sensitive Permission','sensitive_permission'));\nconst cost = yes(text('New Cost','new_cost','Purchase Required'));\nconst ownerJudgment = yes(text('Owner Judgment','owner_judgment','Final Submission'));\nconst decisionRequired = yes(text('Outcome Decision Required','decision_required'));\nlet owner = String(text('Execution Owner','execution_owner','Owner','owner')).trim();\nif (!owner && value !== 'no' && !['obsolete','cancelled','canceled'].includes(status)) owner = 'S/PM Orchestration';\nlet disposition = 'hold';\nlet reason = 'Waiting silently; no authorized executable next action.';\nif (value === 'no' || ['obsolete','cancelled','canceled'].includes(status)) { disposition = 'archive'; reason = 'Task is obsolete or has no remaining value.'; }\nelse if (sensitive || cost || ownerJudgment || decisionRequired) { disposition = 'escalate'; reason = sensitive ? 'Sensitive permission required.' : cost ? 'New cost or purchase required.' : ownerJudgment ? 'Final owner-only judgment or submission required.' : 'Outcome-changing decision required.'; }\nelse if (yes(text('Authorized','authorized')) && next) { disposition = 'execute'; reason = 'Next action is clear and authorized.'; }\nreturn { json: { ...r, 'Execution Owner': owner, _followUp: { disposition, reason, owner, nextAction: next, taskId: String(text('Task ID','task_id','ID','id')), runId: r._runId, readAt: r._readAt } } };"
+      },
+      "id": "classify",
+      "name": "Assign Owner and Decide",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-180, 0]
+    },
+    {
+      "parameters": {
+        "rules": { "values": [
+          { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json._followUp.disposition }}", "rightValue": "execute", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "execute" },
+          { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json._followUp.disposition }}", "rightValue": "escalate", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "escalate" },
+          { "conditions": { "options": { "caseSensitive": true, "typeValidation": "strict" }, "conditions": [{ "leftValue": "={{ $json._followUp.disposition }}", "rightValue": "archive", "operator": { "type": "string", "operation": "equals" } }] }, "renameOutput": true, "outputKey": "archive" }
+        ] },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "route",
+      "name": "Route Disposition",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [60, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ASSISTANT_WORKER_ROUTER_URL }}",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.ASSISTANT_WORKER_ROUTER_TOKEN }}" }] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { taskId: $json._followUp.taskId, owner: $json._followUp.owner, action: $json._followUp.nextAction, source: 'Assistant Control', runId: $json._followUp.runId } }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "worker",
+      "name": "Route to Worker",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, -240]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.ASSISTANT_SEIF_ESCALATION_URL }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { taskId: $json._followUp.taskId, decision: $json._followUp.reason, nextAction: $json._followUp.nextAction, runId: $json._followUp.runId } }}",
+        "options": { "response": { "response": { "neverError": true } } }
+      },
+      "id": "escalate",
+      "name": "Escalate Decision to Seif",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, -80]
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "return { json: { ...$json, Status: 'Archived', _evidence: 'Archived by hourly follow-up engine' } };" },
+      "id": "archive",
+      "name": "Archive Obsolete Definition",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [340, 80]
+    },
+    {
+      "parameters": { "mode": "runOnceForEachItem", "jsCode": "return { json: { ...$json, _evidence: 'No escalation; held silently' } };" },
+      "id": "silent",
+      "name": "Keep Working Silently",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [340, 240]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $env.ASSISTANT_CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Assistant Activity" },
+        "columns": { "mappingMode": "defineBelow", "value": {
+          "Run ID": "={{ $('Assign Owner and Decide').item.json._followUp.runId }}",
+          "Task ID": "={{ $('Assign Owner and Decide').item.json._followUp.taskId }}",
+          "Timestamp": "={{ $now.toISO() }}",
+          "Disposition": "={{ $('Assign Owner and Decide').item.json._followUp.disposition }}",
+          "Execution Owner": "={{ $('Assign Owner and Decide').item.json._followUp.owner }}",
+          "Reason": "={{ $('Assign Owner and Decide').item.json._followUp.reason }}",
+          "Outcome": "={{ $json.statusCode ? ('HTTP ' + $json.statusCode) : ($json._evidence || 'Dispatched') }}",
+          "Evidence URL": "={{ $execution.url }}"
+        } },
+        "options": {}
+      },
+      "id": "audit",
+      "name": "Append Redacted Audit Evidence",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [640, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_IN_N8N", "name": "Google Sheets OAuth2" } }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": { "__rl": true, "mode": "id", "value": "={{ $env.ASSISTANT_CONTROL_SHEET_ID }}" },
+        "sheetName": { "__rl": true, "mode": "name", "value": "Assistant Control" },
+        "columns": { "mappingMode": "defineBelow", "value": {
+          "Task ID": "={{ $('Assign Owner and Decide').item.json._followUp.taskId }}",
+          "Execution Owner": "={{ $('Assign Owner and Decide').item.json._followUp.owner }}",
+          "Last Follow-up": "={{ $now.toISO() }}",
+          "Follow-up Disposition": "={{ $('Assign Owner and Decide').item.json._followUp.disposition }}",
+          "Status": "={{ $('Assign Owner and Decide').item.json._followUp.disposition === 'archive' ? 'Archived' : $('Assign Owner and Decide').item.json.Status }}",
+          "Evidence Link": "={{ $execution.url }}"
+        }, "matchingColumns": ["Task ID"] },
+        "options": {}
+      },
+      "id": "link-evidence",
+      "name": "Link Evidence to Assistant Control",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [880, 0],
+      "credentials": { "googleSheetsOAuth2Api": { "id": "REPLACE_IN_N8N", "name": "Google Sheets OAuth2" } }
+    }
+  ],
+  "connections": {
+    "Every Hour": { "main": [[{ "node": "Read Assistant Control", "type": "main", "index": 0 }]] },
+    "Manual Evidence Run": { "main": [[{ "node": "Read Assistant Control", "type": "main", "index": 0 }]] },
+    "Read Assistant Control": { "main": [[{ "node": "Keep Active Rows", "type": "main", "index": 0 }]] },
+    "Keep Active Rows": { "main": [[{ "node": "Assign Owner and Decide", "type": "main", "index": 0 }]] },
+    "Assign Owner and Decide": { "main": [[{ "node": "Route Disposition", "type": "main", "index": 0 }]] },
+    "Route Disposition": { "main": [
+      [{ "node": "Route to Worker", "type": "main", "index": 0 }],
+      [{ "node": "Escalate Decision to Seif", "type": "main", "index": 0 }],
+      [{ "node": "Archive Obsolete Definition", "type": "main", "index": 0 }],
+      [{ "node": "Keep Working Silently", "type": "main", "index": 0 }]
+    ] },
+    "Route to Worker": { "main": [[{ "node": "Append Redacted Audit Evidence", "type": "main", "index": 0 }]] },
+    "Escalate Decision to Seif": { "main": [[{ "node": "Append Redacted Audit Evidence", "type": "main", "index": 0 }]] },
+    "Archive Obsolete Definition": { "main": [[{ "node": "Append Redacted Audit Evidence", "type": "main", "index": 0 }]] },
+    "Keep Working Silently": { "main": [[{ "node": "Append Redacted Audit Evidence", "type": "main", "index": 0 }]] },
+    "Append Redacted Audit Evidence": { "main": [[{ "node": "Link Evidence to Assistant Control", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1", "saveDataErrorExecution": "all", "saveDataSuccessExecution": "all", "saveManualExecutions": true },
+  "active": false,
+  "versionId": "0a381b39-b511-48c2-a4d3-72d5759ca083",
+  "meta": { "templateCredsSetupCompleted": false },
+  "tags": [{ "name": "assistant-hub" }, { "name": "hourly" }]
+}
