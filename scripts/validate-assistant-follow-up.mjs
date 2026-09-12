@@ -35,7 +35,7 @@ const suppressed = select([
   { 'Task ID': 'in-flight', Status: 'Active', Priority: 'P0', 'Last Follow-up': oneMinuteAgo, 'Follow-up Disposition': 'execute' },
   { 'Task ID': 'changed-after-dispatch', Status: 'Active', Priority: 'P0', 'Last Follow-up': oneMinuteAgo, 'Follow-up Disposition': 'execute', 'Updated At': oneSecondLater },
 ]);
-assert.deepEqual(suppressed.map((row) => row['Task ID']), ['changed-after-dispatch', 'duplicate']);
+assert.deepEqual(suppressed.map((row) => row['Task ID']), ['duplicate', 'changed-after-dispatch']);
 
 const annotatedGate = decide({
   'Task ID': 'annotated-owner-gate',
