@@ -77,8 +77,8 @@ describe("Assistant Control hourly workflow", () => {
       },
     ]);
     expect(result.map((row) => row["Task ID"])).toEqual([
-      "changed-after-dispatch",
       "duplicate",
+      "changed-after-dispatch",
     ]);
   });
 
