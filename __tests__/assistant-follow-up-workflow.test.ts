@@ -5,9 +5,20 @@ const workflow = JSON.parse(
   readFileSync("n8n/workflows/assistant-control-hourly-follow-up.json", "utf8"),
 );
 
+const selectionNode = workflow.nodes.find(
+  (node: { name: string }) => node.name === "Keep Active Rows",
+);
 const decisionNode = workflow.nodes.find(
   (node: { name: string }) => node.name === "Assign Owner and Decide",
 );
+
+function select(rows: Array<Record<string, unknown>>) {
+  const evaluate = new Function("$input", "$execution", selectionNode.parameters.jsCode);
+  return evaluate(
+    { all: () => rows.map((json) => ({ json })) },
+    { id: "test-run" },
+  ).map((item: { json: Record<string, unknown> }) => item.json);
+}
 
 function decide(row: Record<string, unknown>) {
   const evaluate = new Function("$json", decisionNode.parameters.jsCode);
@@ -21,6 +32,70 @@ describe("Assistant Control hourly workflow", () => {
     expect(schedule.parameters.rule.interval).toEqual([{ field: "hours", hoursInterval: 1 }]);
     expect(workflow.connections["Manual Evidence Run"]).toBeTruthy();
     expect(read.parameters.sheetName.value).toBe("Assistant Control");
+  });
+
+  it("selects a bounded priority-ordered batch", () => {
+    const result = select([
+      { "Task ID": "p2", Status: "Active", Priority: "P2" },
+      { "Task ID": "p0-b", Status: "Active", Priority: "P0" },
+      { "Task ID": "p3", Status: "Active", Priority: "P3" },
+      { "Task ID": "p1-a", Status: "Active", Priority: "P1" },
+      { "Task ID": "p0-a", Status: "Active", Priority: "Urgent" },
+      { "Task ID": "p1-b", Status: "Active", Priority: "High" },
+    ]);
+    expect(result).toHaveLength(5);
+    expect(result.map((row) => row["Task ID"])).toEqual([
+      "p0-a",
+      "p0-b",
+      "p1-a",
+      "p1-b",
+      "p2",
+    ]);
+  });
+
+  it("suppresses duplicate task IDs and recent in-flight execution across runs", () => {
+    const now = new Date();
+    const oneMinuteAgo = new Date(now.getTime() - 60_000).toISOString();
+    const oneSecondLater = new Date(now.getTime() + 1_000).toISOString();
+    const result = select([
+      { "Task ID": "duplicate", Status: "Active", Priority: "P0" },
+      { "Task ID": "duplicate", Status: "Active", Priority: "P0" },
+      {
+        "Task ID": "in-flight",
+        Status: "Active",
+        Priority: "P0",
+        "Last Follow-up": oneMinuteAgo,
+        "Follow-up Disposition": "execute",
+      },
+      {
+        "Task ID": "changed-after-dispatch",
+        Status: "Active",
+        Priority: "P0",
+        "Last Follow-up": oneMinuteAgo,
+        "Follow-up Disposition": "execute",
+        "Updated At": oneSecondLater,
+      },
+    ]);
+    expect(result.map((row) => row["Task ID"])).toEqual([
+      "changed-after-dispatch",
+      "duplicate",
+    ]);
+  });
+
+  it("respects follow-up cooldowns when a row has not changed", () => {
+    const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
+    const result = select([
+      {
+        "Task ID": "hourly-too-soon",
+        Status: "Active",
+        Priority: "P0",
+        "Last Follow-up": oneMinuteAgo,
+        "Follow-up Trigger": "Hourly",
+        "Follow-up Disposition": "hold",
+      },
+      { "Task ID": "fresh", Status: "Active", Priority: "P1" },
+    ]);
+    expect(result.map((row) => row["Task ID"])).toEqual(["fresh"]);
   });
 
   it("routes execution, escalation, archive, and silent outcomes", () => {
@@ -43,6 +118,19 @@ describe("Assistant Control hourly workflow", () => {
     });
     expect(result["Execution Owner"]).toBe("S/PM Orchestration");
     expect(result._followUp.disposition).toBe("execute");
+  });
+
+  it("recognizes annotated yes values used by the live sheet", () => {
+    const result = decide({
+      "Task ID": "annotated-owner-gate",
+      Status: "Active",
+      "Has Value": "yes",
+      "Next Action": "Publish externally",
+      Authorized: "yes",
+      "Owner Judgment": "yes — owner gates only",
+    });
+    expect(result._followUp.disposition).toBe("escalate");
+    expect(result._followUp.reason).toBe("Final owner-only judgment or submission required.");
   });
 
   it("keeps ordinary ambiguity silent instead of escalating", () => {
