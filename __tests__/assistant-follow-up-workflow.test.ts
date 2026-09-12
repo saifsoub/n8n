@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const workflow = JSON.parse(
-  readFileSync("n8n/workflows/assistant-control-hourly-follow-up.json", "utf8"),
+  readFileSync("workflows/assistant-control-hourly-follow-up.json", "utf8"),
 );
 
 const selectionNode = workflow.nodes.find(
