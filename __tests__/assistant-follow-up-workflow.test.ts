@@ -120,6 +120,16 @@ describe("Assistant Control hourly workflow", () => {
     expect(result._followUp.disposition).toBe("execute");
   });
 
+  it("configures the worker route authorization header as a bearer token expression", () => {
+    const worker = workflow.nodes.find((node: { name: string }) => node.name === "Route to Worker");
+    expect(worker.parameters.headerParameters.parameters).toEqual([
+      {
+        name: "Authorization",
+        value: "={{ 'Bearer ' + $env.ASSISTANT_WORKER_ROUTER_TOKEN }}",
+      },
+    ]);
+  });
+
   it("recognizes annotated yes values used by the live sheet", () => {
     const result = decide({
       "Task ID": "annotated-owner-gate",
@@ -172,7 +182,7 @@ describe("Assistant Control hourly workflow", () => {
     ]);
     const controlUpdate = workflow.nodes.find((node: { name: string }) => node.name === "Link Evidence to Assistant Control");
     expect(controlUpdate.parameters.operation).toBe("update");
-    expect(controlUpdate.parameters.columns.matchingColumns).toEqual(["Task ID"]);
+    expect(controlUpdate.parameters.columns.matchingColumns).toEqual(["row_number"]);
     expect(workflow.connections["Append Redacted Audit Evidence"].main[0][0].node).toBe("Link Evidence to Assistant Control");
   });
 });

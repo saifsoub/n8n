@@ -72,7 +72,7 @@
         "method": "POST",
         "url": "={{ $env.ASSISTANT_WORKER_ROUTER_URL }}",
         "sendHeaders": true,
-        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "=Bearer {{ $env.ASSISTANT_WORKER_ROUTER_TOKEN }}" }] },
+        "headerParameters": { "parameters": [{ "name": "Authorization", "value": "={{ 'Bearer ' + $env.ASSISTANT_WORKER_ROUTER_TOKEN }}" }] },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { taskId: $json._followUp.taskId, owner: $json._followUp.owner, action: $json._followUp.nextAction, source: 'Assistant Control', runId: $json._followUp.runId } }}",
@@ -145,13 +145,13 @@
         "documentId": { "__rl": true, "mode": "id", "value": "={{ $env.ASSISTANT_CONTROL_SHEET_ID }}" },
         "sheetName": { "__rl": true, "mode": "name", "value": "Assistant Control" },
         "columns": { "mappingMode": "defineBelow", "value": {
-          "Task ID": "={{ $('Assign Owner and Decide').item.json._followUp.taskId }}",
+          "row_number": "={{ $('Assign Owner and Decide').item.json._rowNumber }}",
           "Execution Owner": "={{ $('Assign Owner and Decide').item.json._followUp.owner }}",
           "Last Follow-up": "={{ $now.toISO() }}",
           "Follow-up Disposition": "={{ $('Assign Owner and Decide').item.json._followUp.disposition }}",
           "Status": "={{ $('Assign Owner and Decide').item.json._followUp.disposition === 'archive' ? 'Archived' : $('Assign Owner and Decide').item.json.Status }}",
           "Evidence Link": "={{ $execution.url }}"
-        }, "matchingColumns": ["Task ID"] },
+        }, "matchingColumns": ["row_number"] },
         "options": {}
       },
       "id": "link-evidence",
