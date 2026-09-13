@@ -18,6 +18,10 @@ jobs:
             jq empty "$file"
           done
 
+      - name: Validate Assistant Hub priority and duplicate safety
+        run: node scripts/validate-assistant-follow-up.mjs
+
       - name: Validate docker compose
         run: |
+          cp .env.example .env
           docker compose -f docker-compose.local.yml config >/dev/null
