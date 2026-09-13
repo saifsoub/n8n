@@ -36,12 +36,12 @@ describe("Assistant Control hourly workflow", () => {
 
   it("selects a bounded priority-ordered batch", () => {
     const result = select([
-      { "Task ID": "p2", Status: "Active", Priority: "P2" },
-      { "Task ID": "p0-b", Status: "Active", Priority: "P0" },
-      { "Task ID": "p3", Status: "Active", Priority: "P3" },
-      { "Task ID": "p1-a", Status: "Active", Priority: "P1" },
-      { "Task ID": "p0-a", Status: "Active", Priority: "Urgent" },
-      { "Task ID": "p1-b", Status: "Active", Priority: "High" },
+      { row_number: 6, "Task ID": "p2", Status: "Active", Priority: "P2" },
+      { row_number: 2, "Task ID": "p0-b", Status: "Active", Priority: "P0" },
+      { row_number: 5, "Task ID": "p3", Status: "Active", Priority: "P3" },
+      { row_number: 3, "Task ID": "p1-a", Status: "Active", Priority: "P1" },
+      { row_number: 1, "Task ID": "p0-a", Status: "Active", Priority: "Urgent" },
+      { row_number: 4, "Task ID": "p1-b", Status: "Active", Priority: "High" },
     ]);
     expect(result).toHaveLength(5);
     expect(result.map((row) => row["Task ID"])).toEqual([
@@ -58,9 +58,10 @@ describe("Assistant Control hourly workflow", () => {
     const oneMinuteAgo = new Date(now.getTime() - 60_000).toISOString();
     const oneSecondLater = new Date(now.getTime() + 1_000).toISOString();
     const result = select([
-      { "Task ID": "duplicate", Status: "Active", Priority: "P0" },
-      { "Task ID": "duplicate", Status: "Active", Priority: "P0" },
+      { row_number: 1, "Task ID": "duplicate", Status: "Active", Priority: "P0" },
+      { row_number: 2, "Task ID": "duplicate", Status: "Active", Priority: "P0" },
       {
+        row_number: 3,
         "Task ID": "in-flight",
         Status: "Active",
         Priority: "P0",
@@ -68,6 +69,7 @@ describe("Assistant Control hourly workflow", () => {
         "Follow-up Disposition": "execute",
       },
       {
+        row_number: 4,
         "Task ID": "changed-after-dispatch",
         Status: "Active",
         Priority: "P0",
@@ -86,6 +88,7 @@ describe("Assistant Control hourly workflow", () => {
     const oneMinuteAgo = new Date(Date.now() - 60_000).toISOString();
     const result = select([
       {
+        row_number: 1,
         "Task ID": "hourly-too-soon",
         Status: "Active",
         Priority: "P0",
@@ -93,7 +96,7 @@ describe("Assistant Control hourly workflow", () => {
         "Follow-up Trigger": "Hourly",
         "Follow-up Disposition": "hold",
       },
-      { "Task ID": "fresh", Status: "Active", Priority: "P1" },
+      { row_number: 2, "Task ID": "fresh", Status: "Active", Priority: "P1" },
     ]);
     expect(result.map((row) => row["Task ID"])).toEqual(["fresh"]);
   });
@@ -164,6 +167,11 @@ describe("Assistant Control hourly workflow", () => {
     });
     expect(result._followUp.disposition).toBe("escalate");
     expect(result._followUp.reason).toBe("Outcome-changing decision required.");
+  });
+
+  it("skips rows that cannot be linked back to a sheet row", () => {
+    const result = select([{ "Task ID": "no-row-number", Status: "Active", Priority: "P0" }]);
+    expect(result).toEqual([]);
   });
 
   it("archives obsolete work rather than leaving it ownerless", () => {

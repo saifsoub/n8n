@@ -25,9 +25,9 @@ activate it in n8n; the **Every Hour** schedule then runs once per hour. Success
 and failed executions are retained by the workflow settings. Each processed row
 also appends a redacted audit record (run ID, task ID, disposition, owner, reason,
 delivery outcome, and n8n execution URL) to `Assistant Activity`; secrets and task payloads are not
-written there. It then updates the matching `Task ID` in `Assistant Control` with
-the assigned owner, last follow-up time, disposition, and evidence link. Add those
-four output columns to the control tab before activation.
+written there. It then updates the matching `row_number` in `Assistant Control` with
+the assigned owner, last follow-up time, disposition, and evidence link. Ensure row
+metadata is available from the Sheets read so each update maps back to one row.
 
 ### Routing policy
 
