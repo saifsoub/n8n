@@ -1,0 +1,174 @@
+{
+  "name": "S/ Orchestrator Invoke — Hourly + On-Demand",
+  "nodes": [
+    {
+      "id": "hourly-trigger",
+      "name": "Hourly Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        220
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "manual-trigger",
+      "name": "On-Demand Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        420
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "build-command",
+      "name": "Build Orchestrator Command",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        320
+      ],
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "action",
+              "type": "string",
+              "value": "execute_task"
+            },
+            {
+              "id": "a2",
+              "name": "objective",
+              "type": "string",
+              "value": "Review current operational work, choose the next useful non-financial action, dispatch through S/OS, and return a concise receipt. Do not wait for the owner unless authority is genuinely required."
+            },
+            {
+              "id": "a3",
+              "name": "requested_by",
+              "type": "string",
+              "value": "GPT-5.6 Sol / orchestrator"
+            },
+            {
+              "id": "a4",
+              "name": "priority",
+              "type": "string",
+              "value": "normal"
+            },
+            {
+              "id": "a5",
+              "name": "run_mode",
+              "type": "string",
+              "value": "live"
+            },
+            {
+              "id": "a6",
+              "name": "approval_status",
+              "type": "string",
+              "value": "approved"
+            },
+            {
+              "id": "a7",
+              "name": "idempotency_key",
+              "type": "string",
+              "value": "={{ 'orchestrator_' + $now.toFormat('yyyyLLdd_HH') }}"
+            }
+          ]
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "invoke-gateway",
+      "name": "Invoke S/OS Command Gateway",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.S_AGENTOS_COMMAND_URL || 'http://localhost:5678/webhook/s-agentos-command' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-AgentOS-Key",
+              "value": "={{ $env.S_AGENTOS_OPERATOR_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify($json) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Hourly Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Orchestrator Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "On-Demand Trigger": {
+      "main": [
+        [
+          {
+            "node": "Build Orchestrator Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Orchestrator Command": {
+      "main": [
+        [
+          {
+            "node": "Invoke S/OS Command Gateway",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Dubai"
+  },
+  "tags": [
+    "s-os",
+    "orchestrator",
+    "hourly",
+    "on-demand"
+  ]
+}
